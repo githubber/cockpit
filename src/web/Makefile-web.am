@@ -31,6 +31,7 @@ cockpit_js_PARTS = \
 	src/web/cockpit-terminal.js				\
 	src/web/cockpit-search.js					\
 	src/web/cockpit-accounts.js				\
+	src/web/cockpit-docker.js				\
 	src/web/cockpit-main.js 					\
 	$(NULL)
 
@@ -183,7 +184,7 @@ CLEANFILES += \
 	dbus-test.html \
 	cockpit.js \
 	$(NULL)
-	
+
 EXTRA_DIST += \
 	$(cockpit_js_PARTS) \
 	$(contentdata_DATA) \
