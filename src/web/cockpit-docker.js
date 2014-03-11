@@ -29,6 +29,7 @@ PageContainers.prototype = {
     enter: function(first_visit) {
         if (first_visit) {
             this.client = new DockerClient();
+            $(this.client).on('event', $.proxy (this, "update"));
         }
         this.update();
     },
@@ -51,12 +52,10 @@ PageContainers.prototype = {
         // populate when the results come in.  If this update as been
         // overtaken by a concurrent update that DOM element will
         // never appear in the document.
-
-        function make_container_action (id) {
-        }
-
-        function make_image_action (id) {
-        }
+        //
+        // A better solution would be to maintain a Docker Object
+        // Model that can be consulted synchronously and sends
+        // asynchronous change notifications.
 
         function multi_line(strings) {
             return strings.map(cockpit_esc).join('<br/>');
@@ -67,13 +66,13 @@ PageContainers.prototype = {
 
             function action (op) {
                 if (op == 'start')
-                    me.start_container(container.id);
+                    me.start_container(container.Id);
                 else if (op == 'stop')
-                    me.stop_container(container.id);
+                    me.stop_container(container.Id);
                 else if (op == 'remove')
-                    me.remove_container(container.id);
+                    me.remove_container(container.Id);
             }
-            
+
             var state_td = $('<td>');
             var action_btn = cockpit_action_btn (action,
                                                  [ { title: _("Start"), action: 'start' },
@@ -110,9 +109,9 @@ PageContainers.prototype = {
 
             function action (op) {
                 if (op == 'run')
-                    me.run_image(image.id);
+                    me.run_image(image.Id);
                 else if (op == 'remove')
-                    me.remove_image(image.id);
+                    me.remove_image(image.Id);
             }
 
             var action_btn = cockpit_action_btn (action,
@@ -122,7 +121,7 @@ PageContainers.prototype = {
                                                      danger: true }
                                                  ]);
 
-            var tr = 
+            var tr =
                 $('<tr>').append(
                     $('<td>').text(image.Id.slice(0,12)),
                     $('<td>').html(multi_line(image.RepoTags)),
@@ -161,20 +160,46 @@ PageContainers.prototype = {
                 images.map(render_image));
         });
     },
-  
+
     start_container: function (id) {
+        this.client.post("/containers/" + id + "/start", null, function (error, result) {
+            if (error)
+                cockpit_show_unexpected_error (error);
+        });
     },
 
     stop_container: function (id) {
+        this.client.post("/containers/" + id + "/stop", null, function (error, result) {
+            if (error)
+                cockpit_show_unexpected_error (error);
+        });
     },
 
     remove_container: function (id) {
+        this.client.delete_("/containers/" + id, function (error, result) {
+            if (error)
+                cockpit_show_unexpected_error (error);
+        });
     },
 
     run_image: function (id) {
+        var me = this;
+        this.client.get("/images/" + id + "/json", function (error, info) {
+            if (error) {
+                cockpit_show_unexpected_error (error);
+            } else {
+                PageRunImage.image_info = info;
+                PageRunImage.client = me.client;
+                $("#containers_run_image_dialog").modal('show');
+            }
+        });
     },
 
     remove_image: function (id) {
+        this.client.delete_("/images/" + id, function (error, result) {
+            if (error)
+                cockpit_show_unexpected_error (error);
+        });
     }
 };
 
@@ -184,20 +209,86 @@ function PageContainers() {
 
 cockpit_pages.push(new PageContainers());
 
+PageRunImage.prototype = {
+    _init: function() {
+        this.id = "containers_run_image_dialog";
+    },
+
+    getTitle: function() {
+        return C_("page-title", "Run Image");
+    },
+
+    show: function() {
+    },
+
+    leave: function() {
+    },
+
+    enter: function(first_visit) {
+        if (first_visit) {
+            $("#containers-run-image-run").on('click', $.proxy(this, "run"));
+        }
+
+        // from https://github.com/dotcloud/docker/blob/master/pkg/namesgenerator/names-generator.go
+
+        var left = [ "happy", "jolly", "dreamy", "sad", "angry", "pensive", "focused", "sleepy", "grave", "distracted", "determined", "stoic", "stupefied", "sharp", "agitated", "cocky", "tender", "goofy", "furious", "desperate", "hopeful", "compassionate", "silly", "lonely", "condescending", "naughty", "kickass", "drunk", "boring", "nostalgic", "ecstatic", "insane", "cranky", "mad", "jovial", "sick", "hungry", "thirsty", "elegant", "backstabbing", "clever", "trusting", "loving", "suspicious", "berserk", "high", "romantic", "prickly", "evil" ];
+
+        var right = [ "lovelace", "franklin", "tesla", "einstein", "bohr", "davinci", "pasteur", "nobel", "curie", "darwin", "turing", "ritchie", "torvalds", "pike", "thompson", "wozniak", "galileo", "euclid", "newton", "fermat", "archimedes", "poincare", "heisenberg", "feynman", "hawking", "fermi", "pare", "mccarthy", "engelbart", "babbage", "albattani", "ptolemy", "bell", "wright", "lumiere", "morse", "mclean", "brown", "bardeen", "brattain", "shockley" ];
+
+        function make_name() {
+            function ranchoice(array) {
+                return array[Math.floor(Math.random() * (array.length + 1))];
+            }
+            return ranchoice(left) + "_" + ranchoice(right);
+        }
+
+        $("#containers-run-image-name").val(make_name());
+        $("#containers-run-image-command").val(PageRunImage.image_info.config.Cmd.join(' '));
+    },
+
+    run: function() {
+        var name = $("#containers-run-image-name").val();
+        var cmd = $("#containers-run-image-command").val();
+
+        $("#containers_run_image_dialog").modal('hide');
+
+        PageRunImage.client.post("/containers/create?name=" + encodeURIComponent(name),
+                                 { "Cmd": [ cmd ],
+                                   "Image": PageRunImage.image_info.id
+                                 },
+                                 function (error, result) {
+                                     if (error)
+                                         cockpit_show_unexpected_error (error);
+                                     else {
+                                         PageRunImage.client.post("/containers/" + result.Id + "/start", { },
+                                                                  function (error) {
+                                                                      if (error)
+                                                                          cockpit_show_unexpected_error (error);
+                                                                  });
+                                     }
+                                 });
+    }
+};
+
+function PageRunImage() {
+    this._init();
+}
+
+cockpit_pages.push(new PageRunImage());
+
 /* MOCK DOCKER RESPONDER
 */
 
 function DockerClient() {
     var me = this;
 
-    var containers = 
+    var containers =
          [ {"Command":"node /src/index.js",
             "Created":1394455735,
             "Id":"7a7e76e00fa6563b0c0b70a1e2e3b11146afa11c49aacb34d06c225db1bb812d",
             "Image":"mvollmer/nodejs:latest",
             "Names":["/nodejs"],
-            "Ports":[{"IP":"0.0.0.0","PrivatePort":8080,"PublicPort":8080,"Type":"tcp"}],
-            "Status":"Up 2 hours"
+            "Ports":[{"IP":"0.0.0.0","PrivatePort":8080,"PublicPort":8080,"Type":"tcp"}]
            }
          ];
 
@@ -207,7 +298,7 @@ function DockerClient() {
            "ParentId":"e8b2b9353e7046a91ac38a3246e9061cb36aeb4b15a780dbf2ec810e1ee5f4c8",
            "RepoTags":["mvollmer/nodejs:latest"],
            "Size":0,
-           "VirtualSize":1096326874 
+           "VirtualSize":1096326874
           },
           {"Created":1394104925,
            "Id":"0c295b6f613e58e6a09e6ac6e37503cbfa04bd2f0c1a83dce9315718feba26a2",
@@ -235,29 +326,138 @@ function DockerClient() {
           }
         ];
 
+    var container_state = { };
+    var image_config = { };
+
+    containers.forEach(function (c) {
+        container_state[c.Id] = { "Running":true,
+                                  "Pid":12800,
+                                  "ExitCode":0,
+                                  "StartedAt":"2014-03-10T12:50:33.214661528Z",
+                                  "FinishedAt":"2014-03-10T12:50:23.128194694Z",
+                                  "Ghost":false
+                                };
+    });
+
+    images.forEach(function (img) {
+        image_config[img.Id] = { "Cmd": [ "node", "/src/index.js" ],
+                                 "ExposedPorts": { "8080/tcp": {} }
+                               };
+    });
+
+    function make_id() {
+        return Math.floor(Math.random() * 65535).toString(16) + "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    }
+
+    function find_image(id) {
+        return images.find(function (img) { return img.Id == id; });
+    }
+
     function get (resource, cont) {
-        var match;
+        var match, id, state;
         if (resource == "/containers/json") {
             cont (null, containers);
         } else if (resource == "/images/json") {
             cont (null, images);
         } else if ((match = resource.match("^/containers/(.*)/json$"))) {
-            cont (null, { "ID": match[1],
-                          "State": { "Running":true,
-                                     "Pid":12800,
-                                     "ExitCode":0,
-                                     "StartedAt":"2014-03-10T12:50:33.214661528Z",
-                                     "FinishedAt":"2014-03-10T12:50:23.128194694Z",
-                                     "Ghost":false
-                                   }
+            id = match[1];
+            cont (null, { "ID": id,
+                          "State": container_state[id]
+                        });
+        } else if ((match = resource.match("^/images/(.*)/json$"))) {
+            id = match[1];
+            cont (null, { "id": id,
+                          "config": image_config[id]
                         });
         } else
             cont ("Unrecognized");
     }
 
-    function put (resource, data) {
+    function post (resource, data, cont) {
+        var match, id, name, img, c;
+
+        if ((match = resource.match("^/containers/(.*)/start$"))) {
+            id = match[1];
+            if (container_state[id].Running) {
+                cont (F("start: Cannot start container %{id}: The container %{id} is already running.",
+                        { id: id }));
+            } else {
+                container_state[id].Running = true;
+                container_state[id].StartedAt = "XXX";
+                $(me).trigger('event', { 'status': 'start', 'id': id });
+                cont (null);
+            }
+        } else if ((match = resource.match("^/containers/(.*)/stop$"))) {
+            id = match[1];
+            if (container_state[id].Running) {
+                $(me).trigger('event', { 'status': 'die', 'id': id });
+                setTimeout(function () {
+                    container_state[id].Running = false;
+                    container_state[id].FinishedAt = "XXX";
+                    container_state[id].ExitCode = 123;
+                    $(me).trigger('event', { 'status': 'stop', 'id': id });
+                }, 500);
+            }
+            cont (null);
+        } else if ((match = resource.match("^/containers/create\\?name=(.*)$"))) {
+            id = make_id();
+            name = match[1];
+            img = find_image (data.Image);
+            c = { "Command": data.Cmd.join(' '),
+                  "Created":1394455735,
+                  "Id":id,
+                  "Image": img.RepoTags[0],
+                  "Names": [ name ]
+                };
+            console.log(c);
+            containers.push(c);
+            container_state[id] = { "Running": false,
+                                    "ExitCode": 0
+                                  };
+            $(me).trigger('event', { 'status': 'create', 'id': id });
+            cont (null, { "Id": id });
+        } else {
+            console.log(resource);
+            cont ("Unrecognized");
+        }
+    }
+
+    function delete_ (resource, cont) {
+        var match, id;
+
+        if ((match = resource.match("^/containers/(.*)$"))) {
+            id = match[1];
+            if (!container_state[id])
+                cont(F("container_delete: No such container: %{id}", { id: id }));
+            else if (container_state[id].Running)
+                cont(F("container_delete: Impossible to remove a running container, please stop it first"));
+            else {
+                setTimeout(function () {
+                    delete container_state[id];
+                    containers = containers.filter(function (c) { return c.Id != id; });
+                    $(me).trigger('event', { 'status': 'destroy', 'id': id });
+                }, 1000);
+                cont(null);
+            }
+        } else if ((match = resource.match("^/images/(.*)$"))) {
+            id = match[1];
+            if (!image_config[id]) {
+                cont (F("image_delete: No such image: %{id}", { id: id }));
+            } else {
+                $(me).trigger('event', { 'status': 'untag', 'id': id });
+                setTimeout(function () {
+                    delete image_config[id];
+                    images = images.filter(function (img) { return img.Id != id; });
+                    $(me).trigger('event', { 'status': 'delete', 'id': id });
+                }, 400);
+                cont(null);
+            }
+        } else
+            cont ("Unrecognized");
+
     }
 
     this.get = get;
-    this.put = put;
+    this.post = post;
+    this.delete_ = delete_;
 }

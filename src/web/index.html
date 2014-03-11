@@ -1955,5 +1955,41 @@
       </div>
     </div>
 
+    <div class="modal" id="containers_run_image_dialog"
+         tabindex="-1" role="dialog"
+         data-backdrop="static">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4 class="modal-title">Run Image</h4>
+          </div>
+          <div class="modal-body">
+            <table class="cockpit-form-table">
+              <tr>
+                <td translatable="yes">Container Name</td>
+                <td>
+                  <input class="form-control" type="text" id="containers-run-image-name"/>
+                </td>
+              </tr>
+              <tr>
+                <td translatable="yes">Command</td>
+                <td>
+                  <input class="form-control" type="text" id="containers-run-image-command"/>
+                </td>
+              </tr>
+            </table>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-default" translatable="yes" data-dismiss="modal">
+              Cancel
+            </button>
+            <button class="btn btn-primary" id="containers-run-image-run" translatable="yes">
+              Run
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </body>
 </html>
