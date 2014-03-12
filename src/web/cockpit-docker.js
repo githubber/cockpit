@@ -290,6 +290,35 @@ PageRunImage.prototype = {
 
         $("#containers-run-image-name").val(make_name());
         $("#containers-run-image-command").val(cockpit_quote_cmdline(PageRunImage.image_info.config.Cmd));
+
+        function render_port(p) {
+            var port_input = $('<input class="form-control" style="display:inline;width:auto" >');
+
+            function selected(choice) {
+                port_input.toggle(choice == 'specified');
+            }
+
+            var li =
+                $('<li class="list-group-item">').append(
+                    $('<span>').text(p),
+                    $('<span>').text(_(" bound to ")),
+                    cockpit_select_btn(selected,
+                                       [ { 'title': _("nothing"), choice: 'nothing', is_default: true },
+                                         { 'title': _("random host port"), choice: 'random' },
+                                         { 'title': _("speficied host port"), choice: 'specified' }
+                                       ]).css('display', 'inline'),
+                    port_input);
+            port_input.hide();
+            return li;
+        }
+
+        var ports = $('#containers-run-ports');
+        ports.empty();
+        var list = $('<ul class="list-group">');
+        for (var p in PageRunImage.image_info.config.ExposedPorts) {
+            list.append(render_port(p));
+        }
+        ports.append(list);
     },
 
     run: function() {
@@ -385,10 +414,24 @@ function DockerClient() {
                                 };
     });
 
-    images.forEach(function (img) {
-        image_config[img.Id] = { "Cmd": [ "node", "/src/index.js" ],
-                                 "ExposedPorts": { "8080/tcp": {} }
-                               };
+    image_config["d5cf505c5b998e577950816c6cb7776a5abc01ff09a846b1c4c42e86dc978d96"] =
+        { "Cmd": [ "node", "/src/index.js" ],
+          "ExposedPorts": { "8080/tcp": {} }
+        };
+
+    image_config["0c295b6f613e58e6a09e6ac6e37503cbfa04bd2f0c1a83dce9315718feba26a2"] =
+        { "Cmd": [ "/start.sh" ],
+          "ExposedPorts": { "80/tcp": {},
+                            "22/tcp": {}
+                          }
+        };
+
+    images.forEach(function(img) {
+        if (!image_config[img.Id]) {
+            image_config[img.Id] = { "Cmd": [ "default", "bla", "bla" ],
+                                     "ExposedPorts": { }
+                                   };
+        }
     });
 
     function make_id() {
