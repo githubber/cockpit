@@ -17,6 +17,24 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
+function cockpit_quote_cmdline (cmds) {
+    function quote(arg) {
+        return arg.replace(/\\/g, '\\\\').replace(/ /g, '\\ ');
+    }
+    return cmds.map(quote).join(' ');
+}
+
+function cockpit_unquote_cmdline (string) {
+    function shift(str) {
+        return string.replace(/\\ /g, '\u0001').replace(/\\\\/g, '\u0002');
+    }
+    function unshift(str) {
+        return str.replace(/\u0001/g, ' ').replace(/\u0002/g, '\\');
+    }
+
+    return shift(string).split(' ').map(unshift);
+}
+
 PageContainers.prototype = {
     _init: function() {
         this.id = "containers";
@@ -271,7 +289,7 @@ PageRunImage.prototype = {
         }
 
         $("#containers-run-image-name").val(make_name());
-        $("#containers-run-image-command").val(PageRunImage.image_info.config.Cmd.join(' '));
+        $("#containers-run-image-command").val(cockpit_quote_cmdline(PageRunImage.image_info.config.Cmd));
     },
 
     run: function() {
@@ -281,7 +299,7 @@ PageRunImage.prototype = {
         $("#containers_run_image_dialog").modal('hide');
 
         PageRunImage.client.post("/containers/create?name=" + encodeURIComponent(name),
-                                 { "Cmd": [ cmd ],
+                                 { "Cmd": cockpit_unquote_cmdline(cmd),
                                    "Image": PageRunImage.image_info.id
                                  },
                                  function (error, result) {
@@ -440,7 +458,7 @@ function DockerClient() {
             id = make_id();
             name = match[1];
             img = find_image (data.Image);
-            c = { "Command": data.Cmd.join(' '),
+            c = { "Command": cockpit_quote_cmdline(data.Cmd),
                   "Created":1394455735,
                   "Id":id,
                   "Image": img.RepoTags[0],
