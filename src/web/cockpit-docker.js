@@ -83,12 +83,11 @@ PageContainers.prototype = {
                                                  ]);
             var tr =
                 $('<tr>').append(
-                    $('<td>').text(container.Id.slice(0,12)),
                     $('<td>').html(multi_line(container.Names)),
                     $('<td>').text(container.Image),
                     $('<td>').text(container.Command),
                     state_td,
-                    $('<td>').html(action_btn));
+                    $('<td style="text-align:right">').html(action_btn));
 
             me.client.get("/containers/" + container.Id + "/json",
                           function (error, info) {
@@ -123,11 +122,10 @@ PageContainers.prototype = {
 
             var tr =
                 $('<tr>').append(
-                    $('<td>').text(image.Id.slice(0,12)),
                     $('<td>').html(multi_line(image.RepoTags)),
                     $('<td>').text(new Date(image.Created*1000).toLocaleString()),
                     $('<td>').text(cockpit_format_bytes_pow2 (image.VirtualSize)),
-                    $('<td>').html(action_btn));
+                    $('<td style="text-align:right">').html(action_btn));
             return tr;
         }
 
@@ -137,8 +135,7 @@ PageContainers.prototype = {
         this.client.get('/containers/json', function (error, containers) {
             container_table.append(
                 $('<tr>', { 'style': 'font-weight:bold' }).append(
-                    $('<td>').text(_("Id")),
-                    $('<td>').text(_("Names")),
+                    $('<td>').text(_("Name")),
                     $('<td>').text(_("Image")),
                     $('<td>').text(_("Command")),
                     $('<td>').text(_("Status")),
@@ -152,7 +149,6 @@ PageContainers.prototype = {
         this.client.get('/images/json', function (error, images) {
             images_table.append(
                 $('<tr>', { 'style': 'font-weight:bold' }).append(
-                    $('<td>').text(_("Id")),
                     $('<td>').text(_("Tags")),
                     $('<td>').text(_("Created")),
                     $('<td>').text(_("Virtual Size")),
