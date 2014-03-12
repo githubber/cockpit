@@ -30,6 +30,14 @@ PageContainers.prototype = {
         if (first_visit) {
             this.client = new DockerClient();
             $(this.client).on('event', $.proxy (this, "update"));
+
+            this.container_filter_btn =
+                cockpit_select_btn($.proxy(this, "update"),
+                                   [ { title: _("All"),                 choice: 'all',  is_default: true },
+                                     { title: _("Running"),             choice: 'running' },
+                                     { title: _("10 Recently Created"), choice: 'recent10' }
+                                   ]);
+            $('#containers-containers .panel-heading span').append(this.container_filter_btn);
         }
         this.update();
     },
@@ -42,6 +50,8 @@ PageContainers.prototype = {
 
     update: function() {
         var me = this;
+
+        var filter = cockpit_select_btn_selected(this.container_filter_btn);
 
         // Updating happens asynchronously, as we receive responses
         // from Docker.  However, a event might come in that triggers
@@ -132,7 +142,21 @@ PageContainers.prototype = {
         var container_table = $('<table class="table">');
         $('#containers-containers table').replaceWith(container_table);
 
-        this.client.get('/containers/json', function (error, containers) {
+        var containers_resource = '/containers/json';
+        if (filter == 'all')
+            containers_resource += '?all=1';
+        else if (filter == 'recent10')
+            containers_resource += '?limit=10';
+
+        this.client.get(containers_resource, function (error, containers) {
+            if (error) {
+                container_table.append(
+                    $('<tr>').append(
+                        $('<td>').text(F("Can't get %{resource}: %{error}",
+                                         { resource: containers_resource, error: error }))));
+                return;
+            }
+
             container_table.append(
                 $('<tr>', { 'style': 'font-weight:bold' }).append(
                     $('<td>').text(_("Name")),
@@ -147,6 +171,14 @@ PageContainers.prototype = {
         $('#containers-images table').replaceWith(images_table);
 
         this.client.get('/images/json', function (error, images) {
+            if (error) {
+                images_table.append(
+                    $('<tr>').append(
+                        $('<td>').text(F("Can't get %{resource}: %{error}",
+                                         { resource: '/images/json', error: error }))));
+                return;
+            }
+
             images_table.append(
                 $('<tr>', { 'style': 'font-weight:bold' }).append(
                     $('<td>').text(_("Tags")),
@@ -349,9 +381,18 @@ function DockerClient() {
         return images.find(function (img) { return img.Id == id; });
     }
 
+    function is_running(id) {
+        return container_state[id] && container_state[id].Running;
+    }
+
     function get (resource, cont) {
         var match, id, state;
         if (resource == "/containers/json") {
+            cont (null, containers.filter(function (c) { return is_running(c.Id); }));
+        } else if (resource == "/containers/json?all=1") {
+            cont (null, containers);
+        } else if ((match = resource.match("^/containers/json\\?limit=(.*)$"))) {
+            // cough
             cont (null, containers);
         } else if (resource == "/images/json") {
             cont (null, images);
