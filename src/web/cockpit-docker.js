@@ -265,7 +265,7 @@ PageRunImage.prototype = {
 
         function make_name() {
             function ranchoice(array) {
-                return array[Math.floor(Math.random() * (array.length + 1))];
+                return array[Math.round(Math.random() * (array.length-1))];
             }
             return ranchoice(left) + "_" + ranchoice(right);
         }
