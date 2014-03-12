@@ -765,10 +765,12 @@
           <table>
           </table>
         </div>
+        <a onclick="cockpit_go_down"('container-details')">Container details example page</a><br/>
+        <a onclick="cockpit_go_down"('image-details')">Image details example page</a><br/>        
       </div>
 
       <!-- Layout for container details page -->
-      <div id="container-details">
+      <div id="container-details" class="container-fluid">
         <div class="row">
           <div class="form-group">
 	        <label for="inputPassword3" class="col-sm-1 control-label text-right">Name:</label>
@@ -796,8 +798,8 @@
         </div>
       </div>
       
-      <!-- Layout for image details page (in the wrong place for now) -->
-      <div id="image-details">
+      <!-- Layout for image details page-->
+      <div id="image-details" class="container-fluid">
         <div class="row">
           <div class="col-sm-2">
             <p>Container-name-goes-here</p>
