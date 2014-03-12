@@ -395,7 +395,6 @@ function cockpit_select_btn (func, spec) {
     }
 
     function selected () {
-        console.log("S", selected_choice);
         return selected_choice;
     }
 

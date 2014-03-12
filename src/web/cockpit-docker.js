@@ -117,6 +117,14 @@ PageContainers.prototype = {
                     state_td,
                     $('<td style="text-align:right">').html(action_btn));
 
+            tr.on('click', function (event) {
+                // XXX - dropdown toggles don't seem to eat their events
+                if (!$(event.target).is('button'))
+                    cockpit_go_down ({ page: 'container-details',
+                                       id: container.Id
+                                     });
+            });
+
             me.client.get("/containers/" + container.Id + "/json",
                           function (error, info) {
                               var state = info.State;
@@ -154,6 +162,15 @@ PageContainers.prototype = {
                     $('<td>').text(new Date(image.Created*1000).toLocaleString()),
                     $('<td>').text(cockpit_format_bytes_pow2 (image.VirtualSize)),
                     $('<td style="text-align:right">').html(action_btn));
+
+            tr.on('click', function (event) {
+                // XXX - dropdown toggles don't seem to eat their events
+                if (!$(event.target).is('button'))
+                    cockpit_go_down ({ page: 'image-details',
+                                       id: image.Id
+                                     });
+            });
+
             return tr;
         }
 
@@ -351,6 +368,63 @@ function PageRunImage() {
 
 cockpit_pages.push(new PageRunImage());
 
+PageContainerDetails.prototype = {
+    _init: function() {
+        this.id = "container-details";
+    },
+
+    getTitle: function() {
+        var id = this.container_id;
+        return F(C_("page-title", "Container %{id}"), { id: id? id.slice(0,12) : "<??>" });
+    },
+
+    show: function() {
+    },
+
+    leave: function() {
+    },
+
+    enter: function(first_visit) {
+        this.container_id = cockpit_get_page_param('id');
+    }
+
+};
+
+function PageContainerDetails() {
+    this._init();
+}
+
+cockpit_pages.push(new PageContainerDetails());
+
+PageImageDetails.prototype = {
+    _init: function() {
+        this.id = "image-details";
+    },
+
+    getTitle: function() {
+        var id = this.image_id;
+        return F(C_("page-title", "Image %{id}"), { id: id? id.slice(0,12) : "<??>" });
+    },
+
+    show: function() {
+    },
+
+    leave: function() {
+    },
+
+    enter: function(first_visit) {
+        this.image_id = cockpit_get_page_param('id');
+    }
+
+};
+
+function PageImageDetails() {
+    this._init();
+}
+
+cockpit_pages.push(new PageImageDetails());
+
+
 /* MOCK DOCKER RESPONDER
 */
 
@@ -507,7 +581,6 @@ function DockerClient() {
                   "Image": img.RepoTags[0],
                   "Names": [ name ]
                 };
-            console.log(c);
             containers.push(c);
             container_state[id] = { "Running": false,
                                     "ExitCode": 0
@@ -515,7 +588,6 @@ function DockerClient() {
             $(me).trigger('event', { 'status': 'create', 'id': id });
             cont (null, { "Id": id });
         } else {
-            console.log(resource);
             cont ("Unrecognized");
         }
     }
